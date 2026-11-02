@@ -17,21 +17,24 @@
   :root {
     --bg: #f4f3ef; --surface: #ffffff; --text: #1d1f22; --muted: #6b6f76; --line: #c9c7c0; --thick: #55585e;
     --given: #1d1f22; --placed: #2f62c9; --cand: #7b7f86; --hl: #2f62c9;
-    --unit: #efe9d8; --focus: #fbe7a6; --pattern: #c9dafc; --elim: #d43c3c; --place: #1f9d55; --issue: #fde2e2;
+    --k0: #2f62c9; --k0bg: #dce7ff; --k1: #b77900; --k1bg: #ffeab8; --k2: #7a48cf; --k2bg: #ebdfff; --k3: #0f8576; --k3bg: #cdf1eb; --k4: #c0367f; --k4bg: #ffd9ec;
+    --elim: #d43c3c; --place: #1f9d55; --issue: #fde2e2;
     --btn: #1d1f22; --btn-text: #ffffff; --btn2: #e7e5df;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #16181b; --surface: #202327; --text: #ecebe7; --muted: #9a9ea6; --line: #3a3e44; --thick: #8a8e95;
       --given: #ecebe7; --placed: #8fb3ff; --cand: #9a9ea6; --hl: #8fe0b6;
-      --unit: #33342b; --focus: #4d4526; --pattern: #24365e; --elim: #ff7272; --place: #52d48c; --issue: #4a2323;
+      --k0: #8fb3ff; --k0bg: #23365c; --k1: #f0b93b; --k1bg: #4a3910; --k2: #bb99ff; --k2bg: #39295a; --k3: #4fd1bf; --k3bg: #123f39; --k4: #ff8cc6; --k4bg: #4d2139;
+      --elim: #ff7272; --place: #52d48c; --issue: #4a2323;
       --btn: #ecebe7; --btn-text: #16181b; --btn2: #2d3136;
     }
   }
   :root[data-theme="dark"] {
     --bg: #16181b; --surface: #202327; --text: #ecebe7; --muted: #9a9ea6; --line: #3a3e44; --thick: #8a8e95;
     --given: #ecebe7; --placed: #8fb3ff; --cand: #9a9ea6; --hl: #8fe0b6;
-    --unit: #33342b; --focus: #4d4526; --pattern: #24365e; --elim: #ff7272; --place: #52d48c; --issue: #4a2323;
+    --k0: #8fb3ff; --k0bg: #23365c; --k1: #f0b93b; --k1bg: #4a3910; --k2: #bb99ff; --k2bg: #39295a; --k3: #4fd1bf; --k3bg: #123f39; --k4: #ff8cc6; --k4bg: #4d2139;
+    --elim: #ff7272; --place: #52d48c; --issue: #4a2323;
     --btn: #ecebe7; --btn-text: #16181b; --btn2: #2d3136;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -72,23 +75,39 @@
   .cell.c8 { border-right: 0; }
   .cell.r2, .cell.r5 { border-bottom: 2px solid var(--thick); }
   .cell.r8 { border-bottom: 0; }
-  .cell.unit { background: var(--unit); }
-  .cell.focus { background: var(--focus); }
   .cell.issue { background: var(--issue); }
+  .cell.t0 { background: var(--k0bg); } .cell.g0 { box-shadow: inset 0 0 0 2px var(--k0); }
+  .cell.t1 { background: var(--k1bg); } .cell.g1 { box-shadow: inset 0 0 0 2px var(--k1); }
+  .cell.t2 { background: var(--k2bg); } .cell.g2 { box-shadow: inset 0 0 0 2px var(--k2); }
+  .cell.t3 { background: var(--k3bg); } .cell.g3 { box-shadow: inset 0 0 0 2px var(--k3); }
+  .cell.t4 { background: var(--k4bg); } .cell.g4 { box-shadow: inset 0 0 0 2px var(--k4); }
   .cell.selected { box-shadow: inset 0 0 0 3px var(--hl); }
-  .val { font-size: min(7.4vw, 36px); font-weight: 700; color: var(--placed); }
+  /* Sizes follow the board width (viewport minus gutters, capped at the 520px column). */
+  .val { font-size: calc(min(100vw - 32px, 488px) * 0.068); font-weight: 700; color: var(--placed); }
   .val.given { color: var(--given); }
   .val.ghost { color: var(--place); }
-  .cands { position: absolute; inset: 1px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); }
+  .cands {
+    position: absolute; inset: 2px; display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr));
+  }
   .cands span {
-    display: flex; align-items: center; justify-content: center; font-size: min(3vw, 13px); color: var(--cand);
-    border-radius: 50%; margin: 1px;
+    display: flex; align-items: center; justify-content: center; line-height: 1;
+    font-size: calc(min(100vw - 32px, 488px) * 0.029); color: var(--cand); border-radius: 50%;
   }
   .cands span.hl { color: var(--hl); font-weight: 800; }
   .cands span.x { opacity: 0.35; text-decoration: line-through; }
-  .cands span.pat { background: var(--pattern); color: var(--text); font-weight: 700; }
-  .cands span.c1 { background: #f3c0ef; color: #3b0f37; font-weight: 700; }
+  .cands span.pat { background: var(--text); color: var(--surface); font-weight: 700; }
+  .cands span.c1 { box-shadow: inset 0 0 0 1.5px var(--text); color: var(--text); font-weight: 700; }
   .cands span.el { color: var(--elim); font-weight: 800; text-decoration: line-through; text-decoration-thickness: 2px; }
+
+  .ref { border-radius: 6px; padding: 0 4px; font-weight: 650; white-space: nowrap; }
+  .ref.k0 { background: var(--k0bg); box-shadow: inset 0 0 0 1.5px var(--k0); }
+  .ref.k1 { background: var(--k1bg); box-shadow: inset 0 0 0 1.5px var(--k1); }
+  .ref.k2 { background: var(--k2bg); box-shadow: inset 0 0 0 1.5px var(--k2); }
+  .ref.k3 { background: var(--k3bg); box-shadow: inset 0 0 0 1.5px var(--k3); }
+  .ref.k4 { background: var(--k4bg); box-shadow: inset 0 0 0 1.5px var(--k4); }
+  #wiki { display: inline-block; font-size: 14px; color: var(--hl); margin: -4px 0 12px; text-decoration: none; }
+  #wiki[hidden] { display: none; }
 
   #panel { margin-top: 14px; background: var(--surface); border-radius: 16px; padding: 14px; }
   #technique { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 4px; }
@@ -130,6 +149,7 @@
   <section id="panel">
     <p id="technique"></p>
     <p id="message"></p>
+    <a id="wiki" target="_blank" rel="noopener" hidden></a>
     <div class="row">
       <button id="back" disabled>Back</button>
       <button class="primary" id="hint">Hint</button>

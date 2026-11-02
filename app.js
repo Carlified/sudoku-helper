@@ -149,12 +149,64 @@
     render();
   }
 
+  // ---- References -----------------------------------------------------------------------
+  // Hint text marks rows/columns/boxes as [[u:N]] and groups of cells as [[c:a,b,...]].
+  // Each distinct reference gets a colour, shared by its chip in the text and its cells on the board.
+  const REF = /\[\[(u|c):([\d,]+)\]\]/g;
+  const PALETTE = 5;
+
+  function whereText(st) {
+    return st.focus.length ? `${st.nudge} Look at [[c:${st.focus.join(',')}]].` : st.nudge;
+  }
+
+  function message(st) {
+    return tier === 1 ? st.nudge : tier === 2 ? whereText(st) : st.text;
+  }
+
+  function refColours(st) {
+    const colours = new Map();
+    for (const m of [st.nudge, whereText(st), st.text].join(' ').matchAll(REF)) {
+      const key = m[1] + m[2];
+      if (!colours.has(key)) colours.set(key, colours.size % PALETTE);
+    }
+    return colours;
+  }
+
+  function refsIn(text, colours) {
+    return [...text.matchAll(REF)].map(m => ({ kind: m[1], ids: m[2].split(',').map(Number), k: colours.get(m[1] + m[2]) }));
+  }
+
+  const esc = s => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+  function richText(text, colours) {
+    let html = '', last = 0;
+    for (const m of text.matchAll(REF)) {
+      const ids = m[2].split(',').map(Number);
+      let label = m[1] === 'u' ? GSSolver.unitName(ids[0]) : ids.map(cellName).join(', ');
+      const before = text.slice(0, m.index);
+      if (/(^|[.:]\s)$/.test(before)) label = label[0].toUpperCase() + label.slice(1);
+      html += esc(text.slice(last, m.index)) + `<span class="ref k${colours.get(m[1] + m[2])}">${esc(label)}</span>`;
+      last = m.index + m[0].length;
+    }
+    return html + esc(text.slice(last));
+  }
+
   // ---- Rendering ----------------------------------------------------------------------
   function render() {
-    const st = !editing && tier >= 2 ? step : null;
-    const answer = !editing && tier >= 3 ? step : null;
-    const unitCells = new Set(st ? st.units.flatMap(u => UNITS[u]) : []);
-    const focus = new Set(st ? st.focus : []);
+    const active = !editing && step && tier >= 1 ? step : null;
+    const st = active && tier >= 2 ? step : null;
+    const answer = active && tier >= 3 ? step : null;
+    const colours = active ? refColours(active) : new Map();
+    const tint = new Map(), ring = new Map();
+    if (active) {
+      for (const ref of refsIn(message(active), colours)) {
+        if (ref.kind === 'u') {
+          for (const i of UNITS[ref.ids[0]]) if (!tint.has(i)) tint.set(i, ref.k);
+        } else {
+          for (const i of ref.ids) if (!ring.has(i)) { ring.set(i, ref.k); tint.set(i, ref.k); }
+        }
+      }
+    }
     const pattern = new Map(st ? st.pattern.map(p => [p.cell * 10 + p.d, p.color || 0]) : []);
     const elim = new Set(answer ? answer.elim.map(e => e.cell * 10 + e.d) : []);
     const place = new Map(answer ? answer.place.map(p => [p.cell, p.d]) : []);
@@ -164,8 +216,9 @@
     for (let i = 0; i < 81; i++) {
       const r = (i / 9) | 0, c = i % 9;
       const cls = ['cell', 'r' + r, 'c' + c];
-      if (focus.has(i)) cls.push('focus'); else if (unitCells.has(i)) cls.push('unit');
-      if (issueCells.has(i) && !focus.has(i)) cls.push('issue');
+      if (tint.has(i)) cls.push('t' + tint.get(i));
+      else if (issueCells.has(i)) cls.push('issue');
+      if (ring.has(i)) cls.push('g' + ring.get(i));
       if (i === selected) cls.push('selected');
       let inner = '';
       if (S.values[i]) {
@@ -173,18 +226,20 @@
       } else if (place.has(i)) {
         inner = `<span class="val ghost">${place.get(i)}</span>`;
       } else {
+        // Fixed 3x3 layout: digit d always sits at row (d-1)/3, column (d-1)%3, as in Good Sudoku.
         inner = '<div class="cands">';
         for (let d = 1; d <= 9; d++) {
           const k = i * 10 + d;
+          const pos = `style="grid-row:${((d - 1) / 3 | 0) + 1};grid-column:${(d - 1) % 3 + 1}"`;
           if (S.cands[i] & BIT(d)) {
             const sc = [];
             if (elim.has(k)) sc.push('el');
             else if (pattern.has(k)) sc.push(pattern.get(k) === 1 ? 'c1' : 'pat');
             else if (display && display[i].hl & BIT(d)) sc.push('hl');
-            inner += `<span class="${sc.join(' ')}">${d}</span>`;
+            inner += `<span class="${sc.join(' ')}" ${pos}>${d}</span>`;
           } else if (display && display[i].crossed & BIT(d)) {
-            inner += `<span class="x">${d}</span>`;
-          } else inner += '<span></span>';
+            inner += `<span class="x" ${pos}>${d}</span>`;
+          }
         }
         inner += '</div>';
       }
@@ -207,11 +262,15 @@
       $('message').textContent = 'Tap a cell, then toggle its pencil marks or set its digit.';
     } else {
       $('technique').textContent = tier >= 2 ? step.name : tier === 1 ? 'Hint' : '';
-      $('message').textContent =
-        tier === 0 ? 'Tap Hint to get a nudge toward the next move.' :
-        tier === 1 ? step.nudge :
-        tier === 2 ? step.nudge + ' The cells involved are highlighted.' :
-        step.text;
+      if (tier === 0) $('message').textContent = 'Tap Hint to get a nudge toward the next move.';
+      else $('message').innerHTML = richText(message(step), colours);
+    }
+    const wiki = $('wiki');
+    const showWiki = !editing && step && step.wiki && tier >= 2;
+    wiki.hidden = !showWiki;
+    if (showWiki) {
+      wiki.href = step.wiki;
+      wiki.textContent = `Read about ${step.name.replace(/ \(.*\)$/, '')} on SudokuWiki ↗`;
     }
     hintBtn.textContent = tier === 0 ? 'Hint' : tier === 1 ? 'Show where' : tier === 2 ? 'Show answer' : 'Apply & next';
 

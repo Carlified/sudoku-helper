@@ -25,6 +25,9 @@
   const unitKind = u => (u < 9 ? 'row' : u < 18 ? 'column' : 'box');
   const unitName = u => `${unitKind(u)} ${(u % 9) + 1}`;
   const listNames = cells => cells.map(cellName).join(', ');
+  // Reference markers in hint text; the UI turns them into colour-coded chips and board highlights.
+  const U = u => `[[u:${u}]]`;
+  const C = cells => `[[c:${[].concat(cells).join(',')}]]`;
 
   // ---- Bit helpers (bit d set = candidate d) --------------------------------------------
   const BIT = d => 1 << d;
@@ -165,8 +168,8 @@
         return step({
           name: 'Leftover Candidates', focus: [i], units: UNITS_OF[i],
           elim: hit.map(cell => ({ cell, d: v })),
-          nudge: `Some pencil marks clash with the ${v} in ${cellName(i)}.`,
-          text: `${v} is already placed in ${cellName(i)}, so it can't go anywhere else in its row, column or box. Remove ${v} from ${listNames(hit)}.`,
+          nudge: `Some pencil marks clash with the ${v} in ${C(i)}.`,
+          text: `${v} is already placed in ${C(i)}, so it can't go anywhere else in its row, column or box. Remove ${v} from ${C(hit)}.`,
         });
       }
     }
@@ -181,8 +184,8 @@
       const cell = empty[0];
       return step({
         name: 'Full House', units: [u], focus: [cell], place: [{ cell, d: missing }],
-        nudge: `${unitName(u)[0].toUpperCase() + unitName(u).slice(1)} has only one empty cell left.`,
-        text: `${cellName(cell)} is the last empty cell in ${unitName(u)}. The only digit missing there is ${missing}.`,
+        nudge: `${U(u)} has only one empty cell left.`,
+        text: `${C(cell)} is the last empty cell in ${U(u)}. The only digit missing there is ${missing}.`,
       });
     }
     return null;
@@ -195,7 +198,7 @@
       return step({
         name: 'Naked Single', focus: [i], place: [{ cell: i, d }],
         nudge: `One cell has only a single candidate left.`,
-        text: `${cellName(i)} has only one candidate left, ${d}. Place it.`,
+        text: `${C(i)} has only one candidate left, ${d}. Place it.`,
       });
     }
     return null;
@@ -210,8 +213,8 @@
         return step({
           name: 'Hidden Single', units: [u], focus: pos, place: [{ cell: pos[0], d }],
           pattern: pos.map(cell => ({ cell, d })),
-          nudge: `Look at where ${d} can go in ${unitName(u)}.`,
-          text: `In ${unitName(u)}, ${d} can only go in ${cellName(pos[0])}. Every other cell there is filled or has ruled ${d} out. Place ${d} in ${cellName(pos[0])}.`,
+          nudge: `Look at where ${d} can go in ${U(u)}.`,
+          text: `In ${U(u)}, ${d} can only go in ${C(pos[0])}. Every other cell there is filled or has ruled ${d} out. Place ${d} in ${C(pos[0])}.`,
         });
       }
     }
@@ -231,8 +234,8 @@
           return step({
             name: 'Pointing', units: [b, line], focus: pos, pattern: pos.map(cell => ({ cell, d })),
             elim: elim.map(cell => ({ cell, d })),
-            nudge: `In ${unitName(b)}, all the ${d}s line up.`,
-            text: `In ${unitName(b)}, ${d} can only go in ${listNames(pos)}, which are all in ${unitName(line)}. So the ${d} for ${unitName(line)} must be inside ${unitName(b)}. Remove ${d} from ${listNames(elim)}.`,
+            nudge: `In ${U(b)}, all the ${d}s line up.`,
+            text: `In ${U(b)}, ${d} can only go in ${C(pos)}, which are all in ${U(line)}. So the ${d} for ${U(line)} must be inside ${U(b)}. Remove ${d} from ${C(elim)}.`,
           });
         }
       }
@@ -249,8 +252,8 @@
         return step({
           name: 'Claiming', units: [u, b], focus: pos, pattern: pos.map(cell => ({ cell, d })),
           elim: elim.map(cell => ({ cell, d })),
-          nudge: `In ${unitName(u)}, every possible ${d} is inside one box.`,
-          text: `In ${unitName(u)}, ${d} can only go in ${listNames(pos)}, all inside ${unitName(b)}. So the ${d} for ${unitName(b)} must be in ${unitName(u)}. Remove ${d} from ${listNames(elim)}.`,
+          nudge: `In ${U(u)}, every possible ${d} is inside one box.`,
+          text: `In ${U(u)}, ${d} can only go in ${C(pos)}, all inside ${U(b)}. So the ${d} for ${U(b)} must be in ${U(u)}. Remove ${d} from ${C(elim)}.`,
         });
       }
     }
@@ -278,8 +281,8 @@
         return step({
           name: `Naked ${SUBSET_NAMES[n]}`, units: shared, focus: combo,
           pattern: combo.flatMap(cell => digits(S.cands[cell]).map(d => ({ cell, d }))), elim,
-          nudge: `In ${unitName(u)}, ${n} cells share the same ${n} candidates.`,
-          text: `${listNames(combo)} only contain ${fmtDigits(ds)} between them. Those ${n} digits must fill those ${n} cells, so they can't go anywhere else in ${shared.map(unitName).join(' or ')}. Remove them from ${listNames([...new Set(elim.map(e => e.cell))])}.`,
+          nudge: `In ${U(u)}, ${n} cells share the same ${n} candidates.`,
+          text: `${C(combo)} only contain ${fmtDigits(ds)} between them. Those ${n} digits must fill those ${n} cells, so they can't go anywhere else in ${shared.map(U).join(' or ')}. Remove them from ${C([...new Set(elim.map(e => e.cell))])}.`,
         });
       }
     }
@@ -300,8 +303,8 @@
         return step({
           name: `Hidden ${SUBSET_NAMES[n]}`, units: [u], focus: cells,
           pattern: cells.flatMap(cell => ds.filter(d => has(S, cell, d)).map(d => ({ cell, d }))), elim,
-          nudge: `In ${unitName(u)}, ${n} digits are confined to the same ${n} cells.`,
-          text: `In ${unitName(u)}, ${fmtDigits(ds)} can only go in ${listNames(cells)}. Those cells must hold exactly those digits, so every other candidate in them can go.`,
+          nudge: `In ${U(u)}, ${n} digits are confined to the same ${n} cells.`,
+          text: `In ${U(u)}, ${fmtDigits(ds)} can only go in ${C(cells)}. Those cells must hold exactly those digits, so every other candidate in them can go.`,
         });
       }
     }
@@ -337,7 +340,7 @@
             name: FISH_NAMES[n], units: baseUnits.concat(coverUnits), focus: cells,
             pattern: cells.map(cell => ({ cell, d })), elim,
             nudge: `Look at where ${d} can go in each of the ${kind}.`,
-            text: `In ${baseUnits.map(unitName).join(', ')}, ${d} can only go in ${n} ${other} (${coverUnits.map(u => (u % 9) + 1).join(', ')}). Those ${n} ${kind} need ${n} different ${d}s, and they will use up those ${n} ${other}. Remove ${d} from the rest of those ${other}: ${listNames(elim.map(e => e.cell))}.`,
+            text: `In ${baseUnits.map(U).join(', ')}, ${d} can only go in ${coverUnits.map(U).join(', ')}. Those ${n} ${kind} need ${n} different ${d}s, and they will use up those ${n} ${other}. Remove ${d} from the rest of those ${other}: ${C(elim.map(e => e.cell))}.`,
           });
         }
       }
@@ -374,7 +377,7 @@
             name, units: [L1.u, L2.u], focus: [a1, a2, b1, b2], pattern: [a1, a2, b1, b2].map(cell => ({ cell, d })),
             elim: elim.map(cell => ({ cell, d })),
             nudge: `Look for two places where ${d} has only two spots, joined at one end.`,
-            text: `In ${unitName(L1.u)}, ${d} is either in ${cellName(a1)} or ${cellName(a2)}. In ${unitName(L2.u)}, it is either in ${cellName(b1)} or ${cellName(b2)}. ${cellName(a1)} and ${cellName(b1)} see each other, so they can't both be ${d}. That means at least one of ${cellName(a2)} or ${cellName(b2)} is ${d}. Remove ${d} from cells that see both: ${listNames(elim)}.`,
+            text: `In ${U(L1.u)}, ${d} is either in ${C(a1)} or ${C(a2)}. In ${U(L2.u)}, it is either in ${C(b1)} or ${C(b2)}. ${C(a1)} and ${C(b1)} see each other, so they can't both be ${d}. That means at least one of ${C(a2)} or ${C(b2)} is ${d}. Remove ${d} from cells that see both: ${C(elim)}.`,
           }) };
         }
       }
@@ -401,8 +404,8 @@
             name: 'XY-Wing', focus: [p, A, B],
             pattern: [{ cell: p, d: x }, { cell: p, d: y }, { cell: A, d: ax }, { cell: A, d: z }, { cell: B, d: by }, { cell: B, d: z }],
             elim: elim.map(cell => ({ cell, d: z })),
-            nudge: `Look for three two-candidate cells forming a bent chain around ${cellName(p)}.`,
-            text: `${cellName(p)} is ${x} or ${y}. If it's ${ax}, then ${cellName(A)} must be ${z}. If it's ${by}, then ${cellName(B)} must be ${z}. Either way one of ${cellName(A)} or ${cellName(B)} is ${z}, so remove ${z} from cells that see both: ${listNames(elim)}.`,
+            nudge: `Look for three two-candidate cells forming a bent chain around ${C(p)}.`,
+            text: `${C(p)} is ${x} or ${y}. If it's ${ax}, then ${C(A)} must be ${z}. If it's ${by}, then ${C(B)} must be ${z}. Either way one of ${C(A)} or ${C(B)} is ${z}, so remove ${z} from cells that see both: ${C(elim)}.`,
           });
         }
       }
@@ -423,8 +426,8 @@
           name: 'XYZ-Wing', focus: [p, A, B],
           pattern: [p, A, B].flatMap(cell => digits(S.cands[cell]).map(d => ({ cell, d }))),
           elim: elim.map(cell => ({ cell, d: z })),
-          nudge: `Look at the three-candidate cell ${cellName(p)} and two two-candidate cells it sees.`,
-          text: `${cellName(p)} (${fmtDigits(digits(S.cands[p]))}), ${cellName(A)} and ${cellName(B)} share three digits between them. Whatever ${cellName(p)} turns out to be, one of the three cells must be ${z}. Remove ${z} from cells that see all three: ${listNames(elim)}.`,
+          nudge: `Look at the three-candidate cell ${C(p)} and two two-candidate cells it sees.`,
+          text: `${C(p)} (${fmtDigits(digits(S.cands[p]))}), ${C(A)} and ${C(B)} share three digits between them. Whatever ${C(p)} turns out to be, one of the three cells must be ${z}. Remove ${z} from cells that see all three: ${C(elim)}.`,
         });
       }
     }
@@ -447,7 +450,7 @@
               pattern: [{ cell: c1, d: x }, { cell: c1, d: y }, { cell: c2, d: x }, { cell: c2, d: y }, { cell: s1, d: x }, { cell: s2, d: x }],
               elim: elim.map(cell => ({ cell, d: y })),
               nudge: `Two cells far apart both hold exactly ${p} and ${q}.`,
-              text: `${cellName(c1)} and ${cellName(c2)} are both ${x}/${y}. In ${unitName(L.u)}, ${x} must be in ${cellName(s1)} or ${cellName(s2)}, and those see ${cellName(c1)} and ${cellName(c2)} respectively. So the two cells can't both be ${x}, meaning one of them is ${y}. Remove ${y} from cells that see both: ${listNames(elim)}.`,
+              text: `${C(c1)} and ${C(c2)} are both ${x}/${y}. In ${U(L.u)}, ${x} must be in ${C(s1)} or ${C(s2)}, and those see ${C(c1)} and ${C(c2)} respectively. So the two cells can't both be ${x}, meaning one of them is ${y}. Remove ${y} from cells that see both: ${C(elim)}.`,
             });
           }
         }
@@ -473,7 +476,7 @@
           name: 'Unique Rectangle', focus: cells, pattern: pairs.flatMap(cell => [{ cell, d: a }, { cell, d: b }]),
           elim: [{ cell: odd, d: a }, { cell: odd, d: b }],
           nudge: `Four cells in a rectangle nearly all hold just ${a} and ${b}.`,
-          text: `${listNames(pairs)} are all ${a}/${b}. If ${cellName(odd)} were also ${a} or ${b}, the four corners could swap ${a} and ${b} and the puzzle would have two solutions. A proper puzzle has only one, so remove ${a} and ${b} from ${cellName(odd)}.`,
+          text: `${C(pairs)} are all ${a}/${b}. If ${C(odd)} were also ${a} or ${b}, the four corners could swap ${a} and ${b} and the puzzle would have two solutions. A proper puzzle has only one, so remove ${a} and ${b} from ${C(odd)}.`,
         });
       }
     return null;
@@ -509,7 +512,7 @@
               name: 'Simple Coloring (wrap)', focus: [...color.keys()], pattern,
               elim: groups[k].map(cell => ({ cell, d })),
               nudge: `Follow the chain of cells where ${d} has exactly two spots.`,
-              text: `Colour the cells of the ${d}-chain in two alternating colours: one colour is all ${d}, the other is not. ${cellName(clash[0])} and ${cellName(clash[1])} have the same colour and see each other, so that colour can't be ${d}. Remove ${d} from ${listNames(groups[k])}.`,
+              text: `Colour the cells of the ${d}-chain in two alternating colours: one colour is all ${d}, the other is not. ${C(clash[0])} and ${C(clash[1])} have the same colour and see each other, so that colour can't be ${d}. Remove ${d} from ${C(groups[k])}.`,
             });
           }
         }
@@ -524,7 +527,7 @@
             name: 'Simple Coloring (trap)', focus: [...color.keys()], pattern,
             elim: elim.map(cell => ({ cell, d })),
             nudge: `Follow the chain of cells where ${d} has exactly two spots.`,
-            text: `Colour the cells of the ${d}-chain in two alternating colours: one colour is all ${d}, the other is not. ${listNames(elim)} see${elim.length === 1 ? 's' : ''} both colours, so ${d} goes in a cell it sees either way. Remove ${d} from ${listNames(elim)}.`,
+            text: `Colour the cells of the ${d}-chain in two alternating colours: one colour is all ${d}, the other is not. ${C(elim)} see${elim.length === 1 ? 's' : ''} both colours, so ${d} goes in a cell it sees either way. Remove ${d} from ${C(elim)}.`,
           });
         }
       }
@@ -547,7 +550,7 @@
     return step({
       name: 'BUG+1', focus: [odd], place: [{ cell: odd, d }],
       nudge: `Every empty cell but one has exactly two candidates.`,
-      text: `All unsolved cells except ${cellName(odd)} have two candidates. If ${cellName(odd)} weren't ${d}, the whole board would be pairs, and a board like that has more than one solution. So ${cellName(odd)} is ${d}.`,
+      text: `All unsolved cells except ${C(odd)} have two candidates. If ${C(odd)} weren't ${d}, the whole board would be pairs, and a board like that has more than one solution. So ${C(odd)} is ${d}.`,
     });
   }
 
@@ -594,7 +597,7 @@
       name: 'XY-Chain', focus: cells, pattern: cells.flatMap(cell => digits(S.cands[cell]).map(d => ({ cell, d }))),
       elim: elim.map(cell => ({ cell, d: z })),
       nudge: `Follow a chain of two-candidate cells that starts and ends with ${z}.`,
-      text: `Follow the chain: ${walk}. So either ${cellName(s)} or ${cellName(e)} is ${z}. Remove ${z} from cells that see both: ${listNames(elim)}.`,
+      text: `Follow the chain through ${C(cells)}: ${walk}. So either ${C(s)} or ${C(e)} is ${z}. Remove ${z} from cells that see both: ${C(elim)}.`,
     });
   }
 
@@ -641,8 +644,8 @@
     return step({
       name: 'Contradiction Chain', focus: [best.cell], pattern: [{ cell: best.cell, d: best.d }],
       elim: [{ cell: best.cell, d: best.d }],
-      nudge: `Try assuming ${best.d} in ${cellName(best.cell)} and follow the consequences.`,
-      text: `Suppose ${cellName(best.cell)} were ${best.d}: ${shown.join(' → ')}. Then ${best.bad}. So ${cellName(best.cell)} can't be ${best.d}.`,
+      nudge: `Try assuming ${best.d} in ${C(best.cell)} and follow the consequences.`,
+      text: `Suppose ${C(best.cell)} were ${best.d}: ${shown.join(' → ')}. Then ${best.bad}. So ${C(best.cell)} can't be ${best.d}.`,
     });
   }
 
@@ -654,10 +657,29 @@
     simpleColoring, S => fish(S, 4), bugPlusOne, xyChain, contradiction,
   ];
 
+  // Further reading on SudokuWiki.org for each technique.
+  const WIKI_BASE = 'https://www.sudokuwiki.org/';
+  const WIKI = {
+    'Leftover Candidates': 'Getting_Started', 'Full House': 'Getting_Started',
+    'Naked Single': 'Getting_Started', 'Hidden Single': 'Getting_Started',
+    'Pointing': 'Intersection_Removal', 'Claiming': 'Intersection_Removal',
+    'Naked Pair': 'Naked_Candidates', 'Naked Triple': 'Naked_Candidates', 'Naked Quad': 'Naked_Candidates',
+    'Hidden Pair': 'Hidden_Candidates', 'Hidden Triple': 'Hidden_Candidates', 'Hidden Quad': 'Hidden_Candidates',
+    'X-Wing': 'X_Wing_Strategy', 'Swordfish': 'Sword_Fish_Strategy', 'Jellyfish': 'Jelly_Fish_Strategy',
+    'Skyscraper': 'X_Cycles', '2-String Kite': 'X_Cycles', 'Turbot Fish': 'X_Cycles',
+    'XY-Wing': 'Y_Wing_Strategy', 'XYZ-Wing': 'XYZ_Wing', 'W-Wing': 'W_Wing_Strategy',
+    'Unique Rectangle': 'Unique_Rectangles', 'BUG+1': 'BUG',
+    'Simple Coloring (wrap)': 'Singles_Chains', 'Simple Coloring (trap)': 'Singles_Chains',
+    'XY-Chain': 'XY_Chains', 'Contradiction Chain': 'Nishio_Forcing_Chains',
+  };
+
   function nextStep(S, solution) {
     for (const t of TECHNIQUES) {
       const st = t(S);
-      if (st) return st;
+      if (st) {
+        if (WIKI[st.name]) st.wiki = WIKI_BASE + WIKI[st.name];
+        return st;
+      }
     }
     if (solution) {
       const empty = [...Array(81).keys()].filter(i => !S.values[i]).sort((a, b) => pc(S.cands[a]) - pc(S.cands[b]));
@@ -666,7 +688,7 @@
         return step({
           name: 'Reveal', focus: [cell], place: [{ cell, d: solution[cell] }],
           nudge: `None of the techniques I know apply here.`,
-          text: `None of the techniques I know make progress from these pencil marks. From the full solution, ${cellName(cell)} is ${solution[cell]}.`,
+          text: `None of the techniques I know make progress from these pencil marks. From the full solution, ${C(cell)} is ${solution[cell]}.`,
         });
       }
     }
