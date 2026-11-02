@@ -1,6 +1,6 @@
 // Caches the app so it opens and works with no connection.
-const CACHE = 'sudoku-helper-v3';
-const FILES = ['./', 'index.html', 'app.js', 'vision.js', 'solver.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
+const CACHE = 'sudoku-helper-v4';
+const FILES = ['./', 'index.html', 'about.html', 'app.js', 'vision.js', 'solver.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

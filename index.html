@@ -46,6 +46,8 @@
   }
   header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
   h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  .head-actions { display: flex; align-items: center; gap: 12px; }
+  .about { color: var(--muted); font-size: 14px; font-weight: 600; text-decoration: none; }
   button {
     font: inherit; font-weight: 600; border: 0; border-radius: 12px; padding: 12px 16px; cursor: pointer;
     background: var(--btn2); color: var(--text);
@@ -132,7 +134,10 @@
 <body>
 <header>
   <h1>Sudoku Helper</h1>
-  <button class="small" id="newShot" hidden>New screenshot</button>
+  <div class="head-actions">
+    <a class="about" href="about.html">About</a>
+    <button class="small" id="newShot" hidden>New screenshot</button>
+  </div>
 </header>
 
 <input type="file" id="file" accept="image/*" hidden>
