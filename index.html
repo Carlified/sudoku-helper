@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Sudoku Helper">
+<meta name="theme-color" content="#f4f3ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16181b" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<title>Sudoku Helper</title>
+<style>
+  :root {
+    --bg: #f4f3ef; --surface: #ffffff; --text: #1d1f22; --muted: #6b6f76; --line: #c9c7c0; --thick: #55585e;
+    --given: #1d1f22; --placed: #2f62c9; --cand: #7b7f86; --hl: #2f62c9;
+    --unit: #efe9d8; --focus: #fbe7a6; --pattern: #c9dafc; --elim: #d43c3c; --place: #1f9d55; --issue: #fde2e2;
+    --btn: #1d1f22; --btn-text: #ffffff; --btn2: #e7e5df;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16181b; --surface: #202327; --text: #ecebe7; --muted: #9a9ea6; --line: #3a3e44; --thick: #8a8e95;
+      --given: #ecebe7; --placed: #8fb3ff; --cand: #9a9ea6; --hl: #8fe0b6;
+      --unit: #33342b; --focus: #4d4526; --pattern: #24365e; --elim: #ff7272; --place: #52d48c; --issue: #4a2323;
+      --btn: #ecebe7; --btn-text: #16181b; --btn2: #2d3136;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16181b; --surface: #202327; --text: #ecebe7; --muted: #9a9ea6; --line: #3a3e44; --thick: #8a8e95;
+    --given: #ecebe7; --placed: #8fb3ff; --cand: #9a9ea6; --hl: #8fe0b6;
+    --unit: #33342b; --focus: #4d4526; --pattern: #24365e; --elim: #ff7272; --place: #52d48c; --issue: #4a2323;
+    --btn: #ecebe7; --btn-text: #16181b; --btn2: #2d3136;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    padding: max(12px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+    max-width: 520px; margin: 0 auto; min-height: 100vh;
+  }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  button {
+    font: inherit; font-weight: 600; border: 0; border-radius: 12px; padding: 12px 16px; cursor: pointer;
+    background: var(--btn2); color: var(--text);
+  }
+  button.primary { background: var(--btn); color: var(--btn-text); }
+  button.small { padding: 8px 12px; font-size: 14px; border-radius: 10px; }
+  button:disabled { opacity: 0.4; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+
+  #empty { text-align: center; padding: 48px 8px; }
+  #empty p { color: var(--muted); }
+  #pick { font-size: 18px; padding: 16px 24px; margin-top: 8px; }
+
+  #board {
+    display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); grid-template-rows: repeat(9, minmax(0, 1fr));
+    width: 100%; aspect-ratio: 1;
+    border: 2px solid var(--thick); border-radius: 6px; overflow: hidden; background: var(--surface);
+    user-select: none; -webkit-user-select: none;
+  }
+  .cell {
+    position: relative; min-width: 0; min-height: 0; overflow: hidden;
+    border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center; background: var(--surface);
+  }
+  .cell.c2, .cell.c5 { border-right: 2px solid var(--thick); }
+  .cell.c8 { border-right: 0; }
+  .cell.r2, .cell.r5 { border-bottom: 2px solid var(--thick); }
+  .cell.r8 { border-bottom: 0; }
+  .cell.unit { background: var(--unit); }
+  .cell.focus { background: var(--focus); }
+  .cell.issue { background: var(--issue); }
+  .cell.selected { box-shadow: inset 0 0 0 3px var(--hl); }
+  .val { font-size: min(7.4vw, 36px); font-weight: 700; color: var(--placed); }
+  .val.given { color: var(--given); }
+  .val.ghost { color: var(--place); }
+  .cands { position: absolute; inset: 1px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); }
+  .cands span {
+    display: flex; align-items: center; justify-content: center; font-size: min(3vw, 13px); color: var(--cand);
+    border-radius: 50%; margin: 1px;
+  }
+  .cands span.hl { color: var(--hl); font-weight: 800; }
+  .cands span.x { opacity: 0.35; text-decoration: line-through; }
+  .cands span.pat { background: var(--pattern); color: var(--text); font-weight: 700; }
+  .cands span.c1 { background: #f3c0ef; color: #3b0f37; font-weight: 700; }
+  .cands span.el { color: var(--elim); font-weight: 800; text-decoration: line-through; text-decoration-thickness: 2px; }
+
+  #panel { margin-top: 14px; background: var(--surface); border-radius: 16px; padding: 14px; }
+  #technique { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 4px; }
+  #message { margin: 0 0 12px; min-height: 2.8em; }
+  #issues { margin-top: 12px; }
+  .issue-item { background: var(--issue); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+  .issue-item span { flex: 1; }
+  #tools { margin-top: 12px; }
+  #keypad { margin-top: 12px; display: none; background: var(--surface); border-radius: 16px; padding: 12px; }
+  #keypad.open { display: block; }
+  #keys { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin: 8px 0; }
+  #keys button { padding: 12px 0; }
+  .seg { display: flex; background: var(--btn2); border-radius: 10px; padding: 3px; }
+  .seg button { flex: 1; background: transparent; padding: 8px; font-size: 14px; }
+  .seg button.on { background: var(--surface); }
+  #compare { margin-top: 12px; display: none; }
+  #compare img { width: 100%; border-radius: 6px; display: block; }
+  .note { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  #busy { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Sudoku Helper</h1>
+  <button class="small" id="newShot" hidden>New screenshot</button>
+</header>
+
+<input type="file" id="file" accept="image/*" hidden>
+
+<section id="empty">
+  <p>Take a screenshot in Good Sudoku, then load it here. Everything runs on your phone.</p>
+  <button class="primary" id="pick">Choose screenshot</button>
+  <p id="busy"></p>
+</section>
+
+<main id="main" hidden>
+  <div id="board"></div>
+
+  <section id="panel">
+    <p id="technique"></p>
+    <p id="message"></p>
+    <div class="row">
+      <button id="back" disabled>Back</button>
+      <button class="primary" id="hint">Hint</button>
+    </div>
+  </section>
+
+  <div id="issues"></div>
+
+  <section id="keypad">
+    <div class="seg"><button id="modePencil" class="on">Pencil mark</button><button id="modePen">Digit</button></div>
+    <div id="keys"></div>
+    <div class="row"><button class="small" id="erase">Clear cell</button><button class="small" id="doneEdit">Done</button></div>
+  </section>
+
+  <div class="row" id="tools">
+    <button class="small" id="editBtn">Fix a cell</button>
+    <button class="small" id="compareBtn">Compare screenshot</button>
+  </div>
+  <div id="compare"><img id="compareImg" alt="Grid from your screenshot"></div>
+  <p class="note" id="note"></p>
+</main>
+
+<script src="vision.js"></script>
+<script src="solver.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
