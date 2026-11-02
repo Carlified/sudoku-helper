@@ -139,9 +139,14 @@
     for (let i = 0; i < 81; i++) if (!S.values[i] && !S.cands[i]) {
       issues.push({ kind: 'error', cells: [i], text: `${cellName(i)} is empty but has no candidates left.` });
     }
+    // Solve from every digit on the board (Good Sudoku rejects wrong placements, and givens
+    // can't always be identified). Only if that fails, fall back to the givens to find the culprit.
+    let res = solveCount(S.values);
     const givens = S.values.map((v, i) => (S.given[i] ? v : 0));
-    let res = solveCount(givens.some(Boolean) ? givens : S.values);
-    if (res.count === 0 && givens.some(Boolean)) res = solveCount(S.values);
+    if (res.count === 0 && givens.some(Boolean)) {
+      const g = solveCount(givens);
+      if (g.count === 1) res = g;
+    }
     let solution = null;
     if (res.count === 0) issues.push({ kind: 'error', cells: [], text: 'The digits on the board have no valid solution. Check that the screenshot was read correctly.' });
     else {

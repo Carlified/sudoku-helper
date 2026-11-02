@@ -52,6 +52,7 @@
       $('note').textContent =
         `Read ${digitsRead} digits and ${marksRead} pencil marks.` +
         (autoCount ? ` ${autoCount} empty cell${autoCount > 1 ? 's had' : ' had'} no marks, so I filled in their candidates.` : '') +
+        (res.selectedDigit ? ` ${res.selectedDigit} was selected in Good Sudoku, so starting digits and your own are shown in the same colour.` : '') +
         (g.detected ? '' : ' The grid wasn\'t found where expected, so I guessed its position. Check it with "Compare screenshot".');
       $('empty').hidden = true; $('main').hidden = false; $('newShot').hidden = false;
       $('busy').textContent = '';

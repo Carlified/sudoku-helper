@@ -57,11 +57,27 @@
 
   // Most common colour in the cell = its background.
   function cellBackground(get, x0, y0, w, h) {
-    const counts = new Map();
     const m = Math.round(w * 0.06);
-    for (let y = m; y < h - m; y += 2) {
-      for (let x = m; x < w - m; x += 2) {
-        const p = get(x0 + x, y0 + y);
+    return modeColor(get, x0 + m, y0 + m, x0 + w - m, y0 + h - m, 2);
+  }
+
+  // Average stroke width of a mark: area divided by half its outline length.
+  function strokeWidth(pts) {
+    const key = (x, y) => x * 4096 + y;
+    const set = new Set(pts.map(p => key(p.x, p.y)));
+    let edge = 0;
+    for (const p of pts) {
+      if (!set.has(key(p.x - 1, p.y)) || !set.has(key(p.x + 1, p.y)) ||
+          !set.has(key(p.x, p.y - 1)) || !set.has(key(p.x, p.y + 1))) edge++;
+    }
+    return edge ? (2 * pts.length) / edge : 0;
+  }
+
+  function modeColor(get, xa, ya, xb, yb, stepPx) {
+    const counts = new Map();
+    for (let y = ya; y < yb; y += stepPx) {
+      for (let x = xa; x < xb; x += stepPx) {
+        const p = get(x, y);
         const key = ((p[0] >> 3) << 10) | ((p[1] >> 3) << 5) | (p[2] >> 3);
         const e = counts.get(key);
         if (e) { e.n++; e.r += p[0]; e.g += p[1]; e.b += p[2]; }
@@ -148,6 +164,9 @@
   // Ink-colour statistics are tuned against the distance between the background and
   // the darkest/lightest ink, so the thresholds below are fractions of the cell size.
   const INK_T = 60;
+  // Stroke width (fraction of cell width) separating regular marks (~0.017-0.029)
+  // from bold highlighted marks (~0.053-0.072).
+  const BOLD_T = 0.04;
 
   function analyze(img) {
     const get = makeGetter(img);
@@ -184,7 +203,7 @@
           bestRun = Math.max(bestRun, run);
         }
 
-        if (bestRun > h * 0.33) {
+        if (bestRun > h * 0.42) {
           const bbox = { x0: w, y0: h, x1: 0, y1: 0 };
           for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (ink[y * w + x]) {
             if (x < bbox.x0) bbox.x0 = x; if (x + 1 > bbox.x1) bbox.x1 = x + 1;
@@ -199,10 +218,21 @@
           // Pencil marks: digit d sits at position (d-1) of a 3x3 sub-grid.
           for (let k = 0; k < 9; k++) {
             const sx = (k % 3) * (w / 3), sy = Math.floor(k / 3) * (h / 3);
+            const xa = Math.max(mIn, Math.round(sx)), xb = Math.min(w - mIn, Math.round(sx + w / 3));
+            const ya = Math.max(mIn, Math.round(sy)), yb = Math.min(h - mIn, Math.round(sy + h / 3));
+            // When a digit is selected in Good Sudoku, its pencil marks sit on a coloured square
+            // that fills most of the sub-cell. Read the mark against that square instead, and
+            // ignore the square's own edges (blends of square and cell background).
+            const local = modeColor(get, x0 + xa, y0 + ya, x0 + xb, y0 + yb, 1);
+            const boxed = dist(local, bg) > 30;
             const pts = [];
-            for (let y = Math.max(mIn, Math.round(sy)); y < Math.min(h - mIn, Math.round(sy + h / 3)); y++) {
-              for (let x = Math.max(mIn, Math.round(sx)); x < Math.min(w - mIn, Math.round(sx + w / 3)); x++) {
-                if (ink[y * w + x]) pts.push({ x, y, p: px[y * w + x], d: dist(px[y * w + x], bg) });
+            for (let y = ya; y < yb; y++) {
+              for (let x = xa; x < xb; x++) {
+                const p = boxed ? get(x0 + x, y0 + y) : px[y * w + x];
+                if (!boxed && !ink[y * w + x]) continue;
+                const d = dist(p, local);
+                if (d <= INK_T || (boxed && segDist(p, bg, local) < 20)) continue;
+                pts.push({ x, y, p, d });
               }
             }
             if (pts.length < cw * ch * 0.002) continue;
@@ -211,7 +241,7 @@
             const rep = [0, 0, 0];
             for (const s of strong) { rep[0] += s.p[0]; rep[1] += s.p[1]; rep[2] += s.p[2]; }
             rep[0] /= strong.length; rep[1] /= strong.length; rep[2] /= strong.length;
-            const mark = { cell, k, pts, rep, bg };
+            const mark = { cell, k, pts, rep, bg: local, thickness: strokeWidth(pts) / cw };
             allMarks.push(mark);
             cell.marks[k] = MARK_NORMAL;
           }
@@ -220,9 +250,9 @@
       }
     }
 
-    // Normal pencil-mark ink is the most common mark colour on the board. Ink lying on the
-    // blend between background and that colour is a plain mark; anything else is either a
-    // highlight (bold coloured digit) or a cross-out (thin diagonal slash).
+    // Normal pencil-mark ink is the most common mark colour on the board. A cross-out is a thin
+    // diagonal slash in some other colour. Highlighted marks are told apart by stroke weight
+    // alone (bold vs regular), since their colour shifts with themes and digit selection.
     const normal = [0, 1, 2].map(i => median(allMarks.map(m => m.rep[i])));
     for (const m of allMarks) {
       const off = [];
@@ -232,21 +262,27 @@
         if (o > 40) { off.push({ x: p.x, y: p.y, o }); if (o > maxOff) maxOff = o; }
       }
       m.offFrac = off.length / m.pts.length;
-      if (m.offFrac < 0.2 || off.length < 6) continue;
-      const core = off.filter(p => p.o > maxOff * 0.5);
-      const s = shape(core.length >= 6 ? core : off);
-      m.shape = s;
-      const a = Math.abs(s.angle);
-      const isSlash = s.elong > 8 && s.sxy < 0 && a > 20 && a < 70 && s.len > cw * 0.12;
-      m.cell.marks[m.k] = isSlash ? MARK_CROSSED : MARK_HIGHLIGHT;
+      if (m.offFrac >= 0.2 && off.length >= 6) {
+        const core = off.filter(p => p.o > maxOff * 0.5);
+        const s = shape(core.length >= 6 ? core : off);
+        m.shape = s;
+        const a = Math.abs(s.angle);
+        if (s.elong > 8 && s.sxy < 0 && a > 20 && a < 70 && s.len > cw * 0.12) {
+          m.cell.marks[m.k] = MARK_CROSSED;
+          continue;
+        }
+      }
+      if (m.thickness > BOLD_T) m.cell.marks[m.k] = MARK_HIGHLIGHT;
     }
 
-    markGivens(cells);
-    return { grid, cells, normalInk: normal, marks: allMarks };
+    const selectedDigit = markGivens(cells);
+    return { grid, cells, normalInk: normal, marks: allMarks, selectedDigit };
   }
 
   // Givens have their own background colour. Non-given colours are the ones that also
   // appear under empty cells, or that only occur on one parity of the checker pattern.
+  // Returns the digit selected in Good Sudoku (0 if none); while a digit is selected the
+  // board is re-tinted and givens can't be told apart, so every digit is treated as given.
   function markGivens(cells) {
     const clusters = [];
     for (const cell of cells) {
@@ -256,11 +292,20 @@
       if ((cell.r + cell.c) % 2) cl.odd++; else cl.even++;
       if (!cell.value) cl.empty++;
     }
+    // A selected digit paints all of its cells, and only those, in one solid colour.
+    for (const cl of clusters) {
+      const d = cl.cells[0].value;
+      if (!d || cl.empty || !cl.cells.every(c => c.value === d)) continue;
+      if (cells.some(c => c.value === d && !cl.cells.includes(c))) continue;
+      for (const cell of cells) cell.given = cell.value > 0;
+      return d;
+    }
     for (const cl of clusters) {
       const both = cl.even > 0 && cl.odd > 0;
       const givenColour = cl.empty === 0 && both;
       for (const cell of cl.cells) cell.given = givenColour && cell.value > 0;
     }
+    return 0;
   }
 
   function toBoard(result) {
